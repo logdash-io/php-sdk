@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  php-sdk:
+    build: .
+    volumes:
+      - .:/app
+    environment:
+      - LOGDASH_API_KEY=${LOGDASH_API_KEY:-}
+      - LOGDASH_VERBOSE=true
+    command: php examples.php
+
+  php-test:
+    build: .
+    volumes:
+      - .:/app
+    command: php test.php
+
+  php-dev:
+    build: .
+    volumes:
+      - .:/app
+    command: bash
+    stdin_open: true
+    tty: true

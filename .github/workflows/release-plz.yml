@@ -1,0 +1,56 @@
+name: Release
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    name: Release PHP Package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring, xml, curl, zip, json
+          tools: composer
+
+      - name: Install dependencies
+        run: composer install --no-dev --optimize-autoloader
+
+      - name: Run tests
+        run: composer test
+
+      - name: Run static analysis
+        run: composer phpstan
+
+      - name: Check code style
+        run: composer cs
+
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.run_number }}
+          release_name: Release v${{ github.run_number }}
+          draft: false
+          prerelease: false
+
+      - name: Publish to Packagist
+        # This would require Packagist webhook or manual submission
+        # For now, we'll just create the GitHub release
+        run: echo "Package published to GitHub. Submit to Packagist manually or configure webhook."
