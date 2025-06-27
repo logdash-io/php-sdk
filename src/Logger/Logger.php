@@ -18,11 +18,19 @@ class Logger
         LogLevel::SILLY->value => [80, 80, 80],
     ];
 
+    private readonly mixed $logMethod;
+    private readonly mixed $prefix;
+    private readonly mixed $onLog;
+
     public function __construct(
-        private readonly ?callable $logMethod = null,
-        private readonly ?callable $prefix = null,
-        private readonly ?callable $onLog = null
-    ) {}
+        ?callable $logMethod = null,
+        ?callable $prefix = null,
+        ?callable $onLog = null
+    ) {
+        $this->logMethod = $logMethod;
+        $this->prefix = $prefix;
+        $this->onLog = $onLog;
+    }
 
     public function error(mixed ...$data): void
     {
@@ -39,7 +47,7 @@ class Logger
         $this->log(LogLevel::INFO, implode(' ', $this->convertToStrings($data)));
     }
 
-    public function log(LogLevel|mixed ...$data): void
+    public function log(mixed ...$data): void
     {
         if (count($data) === 0) {
             return;

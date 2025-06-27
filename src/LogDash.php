@@ -9,6 +9,8 @@ use Logdash\Metrics\BaseMetrics;
 use Logdash\Types\InitializationParams;
 use Logdash\Types\RequiredInitializationParams;
 
+require_once __DIR__ . '/Types/LogLevel.php';
+require_once __DIR__ . '/Logger/InternalLogger.php';
 require_once __DIR__ . '/Metrics/CreateMetrics.php';
 require_once __DIR__ . '/Sync/CreateLogSync.php';
 
