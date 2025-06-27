@@ -3,7 +3,7 @@
   "description": "Modern observability platform SDK for PHP",
   "type": "library",
   "license": "MIT",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "authors": [
     {
       "name": "Logdash Team",

@@ -8,9 +8,9 @@ use Logdash\Logdash;
 
 echo "=== Logdash PHP SDK package check ===" . PHP_EOL;
 
-$apiKey = $_ENV['LOGDASH_API_KEY'] ?? null;
-$logsSeed = $_ENV['LOGS_SEED'] ?? 'default';
-$metricsSeed = $_ENV['METRICS_SEED'] ?? '1';
+$apiKey = getenv('LOGDASH_API_KEY') ?: null;
+$logsSeed = getenv('LOGS_SEED') ?: 'default';
+$metricsSeed = getenv('METRICS_SEED') ?: '1';
 
 echo "Using API Key: " . ($apiKey ? '[REDACTED]' : 'none') . PHP_EOL;
 echo "Using Logs Seed: {$logsSeed}" . PHP_EOL;

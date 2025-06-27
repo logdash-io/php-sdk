@@ -1,0 +1,108 @@
+name: Publish Package to packagist
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php-version: ["8.1", "8.2", "8.3"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          extensions: json, curl
+          coverage: xdebug
+
+      - name: Validate composer.json and composer.lock
+        run: composer validate --strict
+
+      - name: Cache Composer packages
+        id: composer-cache
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php-${{ matrix.php-version }}-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-${{ matrix.php-version }}-
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress
+
+      - name: Run PHPUnit tests
+        run: composer run-script test
+
+      - name: Run PHPStan static analysis
+        run: composer run-script phpstan
+
+      - name: Run PHP CodeSniffer
+        run: composer run-script cs
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.1"
+          extensions: json, curl
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-dev --optimize-autoloader
+
+      - name: Create tag from version
+        id: create_tag
+        run: |
+          VERSION=$(php -r "echo json_decode(file_get_contents('composer.json'))->version;")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists"
+            echo "tag_exists=true" >> $GITHUB_OUTPUT
+          else
+            git config --local user.email "action@github.com"
+            git config --local user.name "GitHub Action"
+            git tag "v$VERSION"
+            git push origin "v$VERSION"
+            echo "tag_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Trigger Packagist update
+        if: steps.create_tag.outputs.tag_exists == 'false'
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"repository":{"url":"https://github.com/logdash-io/php-sdk"}}' \
+            "https://packagist.org/api/update-package?username=${{ secrets.PACKAGIST_USERNAME }}&apiToken=${{ secrets.PACKAGIST_TOKEN }}"
+
+      - name: Create GitHub Release
+        if: steps.create_tag.outputs.tag_exists == 'false'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.create_tag.outputs.version }}
+          release_name: Release v${{ steps.create_tag.outputs.version }}
+          body: |
+            ## Changes in v${{ steps.create_tag.outputs.version }}
+
+            See [CHANGELOG.md](CHANGELOG.md) for detailed changes.
+          draft: false
+          prerelease: false

@@ -3,7 +3,7 @@ name: Check deployed package
 on:
   workflow_dispatch:
   workflow_run:
-    workflows: ["Release-plz"]
+    workflows: ["Publish Package to packagist"]
     types:
       - completed
     branches:
@@ -17,10 +17,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Wait for package to propagate
-        run: sleep 60
+      - name: Wait for package to propagate to Packagist
+        run: sleep 120
 
       - name: Make run script executable
         run: chmod +x check-deployed-package/run.sh
