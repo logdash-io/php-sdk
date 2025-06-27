@@ -9,11 +9,11 @@ echo "Generated seed: $LOGS_SEED"
 METRICS_SEED=$(awk 'BEGIN{srand(); print int(rand()*1000000)+1}')
 echo "Generated metrics seed: $METRICS_SEED"
 
-echo "Building LogDash demo Docker image (using published package)..."
+echo "Building Logdash demo Docker image (using published package)..."
 docker build --no-cache -t logdash-php-demo -f check-deployed-package/Dockerfile .
 
 echo
-echo "Running LogDash demo..."
+echo "Running Logdash demo..."
 echo
 
 # Run in non-interactive mode which works everywhere
@@ -27,7 +27,7 @@ echo
 echo "Demo completed!" 
 
 echo
-echo "Authenticating with LogDash API..."
+echo "Authenticating with Logdash API..."
 
 # Authenticate with API using the API key
 AUTH_RESPONSE=$(curl -s -X 'POST' \
@@ -43,7 +43,7 @@ TOKEN=$(echo "$AUTH_RESPONSE" | grep -o '"token":"[^"]*"' | sed 's/"token":"\(.*
 PROJECT_ID=$(echo "$AUTH_RESPONSE" | grep -o '"projectId":"[^"]*"' | sed 's/"projectId":"\(.*\)"/\1/')
 
 if [ -z "$TOKEN" ] || [ -z "$PROJECT_ID" ]; then
-    echo "Error: Failed to authenticate with LogDash API"
+    echo "Error: Failed to authenticate with Logdash API"
     echo "Response: $AUTH_RESPONSE"
     exit 1
 fi
@@ -51,7 +51,7 @@ fi
 echo "Authentication successful. Project ID: $PROJECT_ID"
 
 echo
-echo "Fetching logs from LogDash API..."
+echo "Fetching logs from Logdash API..."
 
 # Fetch logs from the API
 LOGS_RESPONSE=$(curl -s -X 'GET' \
@@ -85,7 +85,7 @@ echo "$EXPECTED_MESSAGES" | while IFS= read -r expected_msg; do
 done
 
 echo
-echo "Fetching metrics from LogDash API..."
+echo "Fetching metrics from Logdash API..."
 
 # Fetch metrics from the API
 METRICS_RESPONSE=$(curl -s -X 'GET' \

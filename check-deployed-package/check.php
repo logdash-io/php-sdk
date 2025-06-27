@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
-use LogDash\LogDash;
+use Logdash\Logdash;
 
-echo "=== LogDash PHP SDK package check ===" . PHP_EOL;
+echo "=== Logdash PHP SDK package check ===" . PHP_EOL;
 
 $apiKey = $_ENV['LOGDASH_API_KEY'] ?? null;
 $logsSeed = $_ENV['LOGS_SEED'] ?? 'default';
@@ -16,8 +16,8 @@ echo "Using API Key: " . ($apiKey ? '[REDACTED]' : 'none') . PHP_EOL;
 echo "Using Logs Seed: {$logsSeed}" . PHP_EOL;
 echo "Using Metrics Seed: {$metricsSeed}" . PHP_EOL;
 
-// Create LogDash instance
-$logdash = LogDash::create($apiKey ? [
+// Create Logdash instance
+$logdash = Logdash::create($apiKey ? [
     'apiKey' => $apiKey,
     'verbose' => true
 ] : []);

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LogDash\Metrics;
+namespace Logdash\Metrics;
 
 interface BaseMetrics
 {

@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace LogDash\Sync;
+namespace Logdash\Sync;
 
-use LogDash\Types\RequiredInitializationParams;
+use Logdash\Types\RequiredInitializationParams;
 
 function createLogSync(RequiredInitializationParams $params): LogSync
 {
     if (empty($params->apiKey)) {
-        \LogDash\Logger\getInternalLogger()->log(
-            'Api key was not provided in the InitializationParams when calling LogDash::create(), using only local logger.'
+        \Logdash\Logger\getInternalLogger()->log(
+            'Api key was not provided in the InitializationParams when calling Logdash::create(), using only local logger.'
         );
         return new NoopLogSync();
     }

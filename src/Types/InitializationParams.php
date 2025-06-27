@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LogDash\Types;
+namespace Logdash\Types;
 
 class InitializationParams
 {

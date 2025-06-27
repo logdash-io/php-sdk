@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace LogDash\Logger;
+namespace Logdash\Logger;
 
-use LogDash\LogLevel;
+use Logdash\LogLevel;
 
 class InternalLogger
 {

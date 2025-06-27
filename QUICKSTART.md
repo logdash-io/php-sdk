@@ -1,6 +1,6 @@
 # Quick Setup Guide
 
-This guide will help you get started with the LogDash PHP SDK in under 5 minutes.
+This guide will help you get started with the Logdash PHP SDK in under 5 minutes.
 
 ## Prerequisites
 
@@ -10,29 +10,31 @@ This guide will help you get started with the LogDash PHP SDK in under 5 minutes
 ## Installation
 
 1. **Install the package via Composer:**
+
    ```bash
    composer require logdash/php-sdk
    ```
 
-2. **Create your first LogDash instance:**
+2. **Create your first Logdash instance:**
+
    ```php
    <?php
    require_once 'vendor/autoload.php';
-   
-   use LogDash\LogDash;
-   
+
+   use Logdash\Logdash;
+
    // For local logging only
-   $logdash = LogDash::create();
+   $logdash = Logdash::create();
    $logger = $logdash->logger();
-   
-   $logger->info('Hello, LogDash!');
+
+   $logger->info('Hello, Logdash!');
    ```
 
 3. **Add cloud synchronization (optional):**
    - Get your API key from [logdash.io](https://logdash.io)
    - Update your code:
    ```php
-   $logdash = LogDash::create([
+   $logdash = Logdash::create([
        'apiKey' => 'your-api-key-here'
    ]);
    ```
@@ -44,12 +46,12 @@ This guide will help you get started with the LogDash PHP SDK in under 5 minutes
 Add to your `AppServiceProvider`:
 
 ```php
-use LogDash\LogDash;
+use Logdash\Logdash;
 
 public function register()
 {
     $this->app->singleton('logdash', function () {
-        return LogDash::create([
+        return Logdash::create([
             'apiKey' => config('services.logdash.api_key'),
             'verbose' => config('app.debug')
         ]);
@@ -58,6 +60,7 @@ public function register()
 ```
 
 Add to `config/services.php`:
+
 ```php
 'logdash' => [
     'api_key' => env('LOGDASH_API_KEY'),
@@ -65,13 +68,14 @@ Add to `config/services.php`:
 ```
 
 Usage in controllers:
+
 ```php
 public function store(Request $request)
 {
     $logdash = app('logdash');
     $logdash->logger()->info('Creating new record');
     $logdash->metrics()->mutate('records_created', 1);
-    
+
     // Your logic here...
 }
 ```
@@ -79,27 +83,29 @@ public function store(Request $request)
 ### Symfony
 
 Add to `config/services.yaml`:
+
 ```yaml
 services:
-    logdash:
-        class: LogDash\LogDash
-        factory: ['LogDash\LogDash', 'create']
-        arguments:
-            - apiKey: '%env(LOGDASH_API_KEY)%'
-              verbose: '%kernel.debug%'
+  logdash:
+    class: Logdash\Logdash
+    factory: ['Logdash\Logdash', "create"]
+    arguments:
+      - apiKey: "%env(LOGDASH_API_KEY)%"
+        verbose: "%kernel.debug%"
 ```
 
 Usage in controllers:
+
 ```php
-use LogDash\LogDash;
+use Logdash\Logdash;
 
 class MyController extends AbstractController
 {
-    public function index(LogDash $logdash): Response
+    public function index(Logdash $logdash): Response
     {
         $logdash->logger()->info('Controller action executed');
         $logdash->metrics()->set('page_views', 42);
-        
+
         return $this->render('template.html.twig');
     }
 }
@@ -108,6 +114,7 @@ class MyController extends AbstractController
 ## Environment Variables
 
 Create a `.env` file:
+
 ```bash
 LOGDASH_API_KEY=your-api-key-here
 LOGDASH_HOST=https://api.logdash.io
@@ -117,11 +124,13 @@ LOGDASH_VERBOSE=false
 ## Testing
 
 Run the examples:
+
 ```bash
 php examples.php
 ```
 
 Run the test script:
+
 ```bash
 php test.php
 ```

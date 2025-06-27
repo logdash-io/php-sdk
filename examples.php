@@ -1,9 +1,9 @@
 <?php
 
 /**
- * LogDash PHP SDK Examples
+ * Logdash PHP SDK Examples
  * 
- * This file demonstrates various usage patterns of the LogDash PHP SDK.
+ * This file demonstrates various usage patterns of the Logdash PHP SDK.
  * Run this file with: php examples.php
  */
 
@@ -11,16 +11,16 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/vendor/autoload.php';
 
-use LogDash\LogDash;
+use Logdash\Logdash;
 
-echo "🚀 LogDash PHP SDK Examples\n";
+echo "🚀 Logdash PHP SDK Examples\n";
 echo "=" . str_repeat("=", 50) . "\n\n";
 
 // Example 1: Basic Local Logging
 echo "📝 Example 1: Local Logging (No API Key)\n";
 echo "-" . str_repeat("-", 40) . "\n";
 
-$logdash = LogDash::create();
+$logdash = Logdash::create();
 $logger = $logdash->logger();
 
 $logger->error('Application encountered an error');
@@ -37,7 +37,7 @@ echo "\n";
 echo "☁️  Example 2: Cloud Logging (With API Key)\n";
 echo "-" . str_repeat("-", 40) . "\n";
 
-$cloudLogdash = LogDash::create([
+$cloudLogdash = Logdash::create([
     'apiKey' => 'your-api-key-here',
     'host' => 'https://api.logdash.io',
     'verbose' => true // Enable verbose mode for debugging
@@ -46,7 +46,7 @@ $cloudLogdash = LogDash::create([
 $cloudLogger = $cloudLogdash->logger();
 $metrics = $cloudLogdash->metrics();
 
-$cloudLogger->info('This message will be sent to LogDash cloud');
+$cloudLogger->info('This message will be sent to Logdash cloud');
 $cloudLogger->error('Critical error - needs immediate attention');
 
 // Metrics examples
@@ -81,7 +81,7 @@ echo "-" . str_repeat("-", 40) . "\n";
 $_ENV['LOGDASH_API_KEY'] = 'env-api-key';
 $_ENV['LOGDASH_VERBOSE'] = 'true';
 
-$envLogdash = LogDash::create([
+$envLogdash = Logdash::create([
     'apiKey' => $_ENV['LOGDASH_API_KEY'] ?? '',
     'verbose' => filter_var($_ENV['LOGDASH_VERBOSE'] ?? false, FILTER_VALIDATE_BOOLEAN)
 ]);

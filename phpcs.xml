@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
-<ruleset name="LogDash">
-    <description>LogDash PHP SDK coding standard</description>
+<ruleset name="Logdash">
+    <description>Logdash PHP SDK coding standard</description>
 
     <file>src</file>
     <file>tests</file>

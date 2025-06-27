@@ -1,4 +1,4 @@
-# LogDash Rust SDK Demo
+# Logdash Rust SDK Demo
 
 Use command below to test if the published SDK works:
 

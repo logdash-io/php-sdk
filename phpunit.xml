@@ -4,7 +4,7 @@
          bootstrap="vendor/autoload.php"
          colors="true">
     <testsuites>
-        <testsuite name="LogDash Test Suite">
+        <testsuite name="Logdash Test Suite">
             <directory>tests</directory>
         </testsuite>
     </testsuites>

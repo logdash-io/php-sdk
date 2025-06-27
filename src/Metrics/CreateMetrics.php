@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace LogDash\Metrics;
+namespace Logdash\Metrics;
 
-use LogDash\Types\RequiredInitializationParams;
+use Logdash\Types\RequiredInitializationParams;
 
 function createMetrics(RequiredInitializationParams $params): BaseMetrics
 {

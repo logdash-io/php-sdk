@@ -1,4 +1,4 @@
-# LogDash PHP SDK
+# Logdash PHP SDK
 
 [![Packagist Version](https://img.shields.io/packagist/v/logdash/php-sdk)](https://packagist.org/packages/logdash/php-sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -43,10 +43,10 @@ composer require logdash/php-sdk
 
 require_once 'vendor/autoload.php';
 
-use LogDash\LogDash;
+use Logdash\Logdash;
 
-// Create LogDash instance without API key for local logging only
-$logdash = LogDash::create();
+// Create Logdash instance without API key for local logging only
+$logdash = Logdash::create();
 $logger = $logdash->logger();
 
 // Log different levels
@@ -63,10 +63,10 @@ $logger->debug('This is a debug message');
 
 require_once 'vendor/autoload.php';
 
-use LogDash\LogDash;
+use Logdash\Logdash;
 
-// Create LogDash instance with API key for cloud sync
-$logdash = LogDash::create([
+// Create Logdash instance with API key for cloud sync
+$logdash = Logdash::create([
     'apiKey' => 'your-api-key-here',
     'host' => 'https://api.logdash.io', // Optional, defaults to this
     'verbose' => true // Optional, for debugging
@@ -91,12 +91,12 @@ $metrics->mutate('error_count', -1); // Decrement by 1
 
 ```php
 // In your AppServiceProvider or custom service provider
-use LogDash\LogDash;
+use Logdash\Logdash;
 
 public function register()
 {
     $this->app->singleton('logdash', function ($app) {
-        return LogDash::create([
+        return Logdash::create([
             'apiKey' => config('services.logdash.api_key'),
             'verbose' => config('app.debug')
         ]);
@@ -118,14 +118,14 @@ public function someMethod()
 // In your services.yaml
 services:
     logdash:
-        class: LogDash\LogDash
-        factory: ['LogDash\LogDash', 'create']
+        class: Logdash\Logdash
+        factory: ['Logdash\Logdash', 'create']
         arguments:
             - apiKey: '%env(LOGDASH_API_KEY)%'
               verbose: '%kernel.debug%'
 
 // Usage in controllers/services
-public function someAction(LogDash $logdash)
+public function someAction(Logdash $logdash)
 {
     $logdash->logger()->info('Action executed');
     $logdash->metrics()->mutate('action_count', 1);
@@ -134,13 +134,14 @@ public function someAction(LogDash $logdash)
 
 ## API Reference
 
-### LogDash
+### Logdash
 
-#### `LogDash::create(array $params = []): LogDash`
+#### `Logdash::create(array $params = []): Logdash`
 
-Creates a new LogDash instance.
+Creates a new Logdash instance.
 
 **Parameters:**
+
 - `apiKey` (string, optional): Your Logdash API key. If not provided, only local logging will work
 - `host` (string, optional): Logdash API host. Defaults to `https://api.logdash.io`
 - `verbose` (bool, optional): Enable verbose internal logging. Defaults to `false`
@@ -150,7 +151,7 @@ Creates a new LogDash instance.
 The logger provides methods for different log levels:
 
 - `error(...$data)`: Log error level messages
-- `warn(...$data)`: Log warning level messages  
+- `warn(...$data)`: Log warning level messages
 - `info(...$data)`: Log info level messages
 - `log(...$data)`: Alias for info level
 - `http(...$data)`: Log HTTP-related messages
@@ -204,7 +205,7 @@ LOGDASH_VERBOSE=true
 ```
 
 ```php
-$logdash = LogDash::create([
+$logdash = Logdash::create([
     'apiKey' => $_ENV['LOGDASH_API_KEY'] ?? '',
     'host' => $_ENV['LOGDASH_HOST'] ?? 'https://api.logdash.io',
     'verbose' => filter_var($_ENV['LOGDASH_VERBOSE'] ?? false, FILTER_VALIDATE_BOOLEAN)
@@ -217,7 +218,7 @@ The SDK is designed to be non-blocking and fail silently in production. If there
 
 - Local logging will continue to work
 - API errors are logged internally when verbose mode is enabled
-- Your application will not be affected by LogDash connectivity issues
+- Your application will not be affected by Logdash connectivity issues
 
 ## Requirements
 

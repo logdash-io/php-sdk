@@ -2,20 +2,20 @@
 
 declare(strict_types=1);
 
-namespace LogDash;
+namespace Logdash;
 
-use LogDash\Logger\Logger;
-use LogDash\Metrics\BaseMetrics;
-use LogDash\Types\InitializationParams;
-use LogDash\Types\RequiredInitializationParams;
+use Logdash\Logger\Logger;
+use Logdash\Metrics\BaseMetrics;
+use Logdash\Types\InitializationParams;
+use Logdash\Types\RequiredInitializationParams;
 
 require_once __DIR__ . '/Metrics/CreateMetrics.php';
 require_once __DIR__ . '/Sync/CreateLogSync.php';
 
-use function LogDash\Metrics\createMetrics;
-use function LogDash\Sync\createLogSync;
+use function Logdash\Metrics\createMetrics;
+use function Logdash\Sync\createLogSync;
 
-class LogDash
+class Logdash
 {
     private Logger $logger;
     private BaseMetrics $metrics;
