@@ -5,6 +5,3 @@ parameters:
 
     scanDirectories:
         - src
-
-    scanFiles:
-        - src
