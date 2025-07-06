@@ -101,7 +101,10 @@ class Logger
         $formattedMessage = "{$datePrefix} {$prefix}{$message}";
 
         $logMethod = $this->logMethod ?? function(string $msg): void {
-            echo $msg . PHP_EOL;
+            file_put_contents(
+                'php://stdout',
+                $msg . PHP_EOL
+            );
         };
 
         $logMethod($formattedMessage);
