@@ -39,8 +39,11 @@ class InternalLogger
             $color[2],
             strtoupper($level->value) . ' '
         );
-        
-        echo "{$datePrefix} {$levelPrefix}{$message}" . PHP_EOL;
+
+        file_put_contents(
+            'php://stdout',
+            "{$datePrefix} {$levelPrefix}{$message}" . PHP_EOL
+        );
     }
 }
 
