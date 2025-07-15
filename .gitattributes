@@ -1,0 +1,15 @@
+/.docker export-ignore
+/.gitattributes export-ignore
+/.github export-ignore
+/.gitignore export-ignore
+/compose.yaml export-ignore
+/README.md export-ignore
+/phpunit.xml.dist export-ignore
+/tests export-ignore
+/QUICKSTART.md export-ignore
+/phpstan.neon export-ignore
+/Makefile export-ignore
+/phpcs.xml export-ignore
+/CHANGELOG.md export-ignore
+/examples.php export-ignore
+/qodana.yaml export-ignore
