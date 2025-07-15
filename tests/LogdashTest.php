@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Logdash\Tests;
 
 use Logdash\Logdash;
-use Logdash\LogLevel;
+use Logdash\Types\LogLevel;
 use PHPUnit\Framework\TestCase;
 
 class LogdashTest extends TestCase
@@ -13,7 +13,7 @@ class LogdashTest extends TestCase
     public function testCreateWithoutApiKey(): void
     {
         $logdash = Logdash::create();
-        
+
         $this->assertInstanceOf(Logdash::class, $logdash);
         $this->assertNotNull($logdash->logger());
         $this->assertNotNull($logdash->metrics());
@@ -26,7 +26,7 @@ class LogdashTest extends TestCase
             'host' => 'https://test.logdash.io',
             'verbose' => true
         ]);
-        
+
         $this->assertInstanceOf(Logdash::class, $logdash);
         $this->assertNotNull($logdash->logger());
         $this->assertNotNull($logdash->metrics());

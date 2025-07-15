@@ -18,7 +18,7 @@
   ],
   "homepage": "https://github.com/logdash-io/php-sdk",
   "require": {
-    "php": ">=8.1",
+    "php": ">=8.2",
     "guzzlehttp/guzzle": "^7.0"
   },
   "require-dev": {
@@ -29,7 +29,11 @@
   "autoload": {
     "psr-4": {
       "Logdash\\": "src/"
-    }
+    },
+    "files": [
+      "src/Sync/CreateLogSync.php",
+      "src/Metrics/CreateMetrics.php"
+    ]
   },
   "autoload-dev": {
     "psr-4": {
@@ -40,6 +44,14 @@
     "test": "phpunit",
     "phpstan": "phpstan analyse",
     "cs": "phpcs",
-    "cbf": "phpcbf"
+    "cbf": "phpcbf",
+    "qa": {
+      "Codestyle": "@cs",
+      "Static analyse": "@phpstan",
+      "Tests": "@test"
+    },
+    "qa:fix": {
+      "Codestyle": "@cbf"
+    }
   }
 }

@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Logdash\Logger;
 
-use Logdash\LogLevel;
+use Logdash\Types\LogLevel;
 
 class InternalLogger
 {
+    private static self $instance;
     private const LOG_LEVEL_COLORS = [
         LogLevel::ERROR->value => [231, 0, 11],
         LogLevel::WARN->value => [254, 154, 0],
@@ -45,14 +46,11 @@ class InternalLogger
             "{$datePrefix} {$levelPrefix}{$message}" . PHP_EOL
         );
     }
+
+    public static function getInternalLogger(): InternalLogger
+    {
+        return self::$instance ??= new self();
+    }
 }
 
 // Create a global instance function
-function getInternalLogger(): InternalLogger
-{
-    static $instance = null;
-    if ($instance === null) {
-        $instance = new InternalLogger();
-    }
-    return $instance;
-}

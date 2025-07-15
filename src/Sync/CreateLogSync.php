@@ -9,7 +9,8 @@ use Logdash\Types\RequiredInitializationParams;
 function createLogSync(RequiredInitializationParams $params): LogSync
 {
     if (empty($params->apiKey)) {
-        \Logdash\Logger\getInternalLogger()->log(
+        \Logdash\Logger\InternalLogger::getInternalLogger()->log(
+        // phpcs:ignore
             'Api key was not provided in the InitializationParams when calling Logdash::create(), using only local logger.'
         );
         return new NoopLogSync();

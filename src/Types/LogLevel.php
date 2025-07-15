@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Logdash;
+namespace Logdash\Types;
 
 enum LogLevel: string
 {

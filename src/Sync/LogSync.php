@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Logdash\Sync;
 
-use Logdash\LogLevel;
+use Logdash\Types\LogLevel;
 
 interface LogSync
 {

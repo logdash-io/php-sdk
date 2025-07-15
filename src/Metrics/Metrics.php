@@ -6,13 +6,8 @@ namespace Logdash\Metrics;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
+use Logdash\Logger\InternalLogger;
 use Logdash\Types\RequiredInitializationParams;
-
-enum MetricOperation: string
-{
-    case SET = 'set';
-    case CHANGE = 'change';
-}
 
 class Metrics implements BaseMetrics
 {
@@ -27,7 +22,7 @@ class Metrics implements BaseMetrics
     public function set(string $name, float $value): void
     {
         if ($this->params->verbose) {
-            \Logdash\Logger\getInternalLogger()->verbose("Setting metric {$name} to {$value}");
+            InternalLogger::getInternalLogger()->verbose("Setting metric {$name} to {$value}");
         }
 
         $this->sendMetric($name, $value, MetricOperation::SET);
@@ -36,7 +31,7 @@ class Metrics implements BaseMetrics
     public function mutate(string $name, float $value): void
     {
         if ($this->params->verbose) {
-            \Logdash\Logger\getInternalLogger()->verbose("Mutating metric {$name} by {$value}");
+            InternalLogger::getInternalLogger()->verbose("Mutating metric {$name} by {$value}");
         }
 
         $this->sendMetric($name, $value, MetricOperation::CHANGE);
@@ -59,7 +54,7 @@ class Metrics implements BaseMetrics
             ]);
         } catch (GuzzleException $e) {
             if ($this->params->verbose) {
-                \Logdash\Logger\getInternalLogger()->verbose("Failed to send metric: " . $e->getMessage());
+                InternalLogger::getInternalLogger()->verbose("Failed to send metric: " . $e->getMessage());
             }
             // Fail silently in production
         }

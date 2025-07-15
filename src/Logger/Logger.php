@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Logdash\Logger;
 
-use Logdash\LogLevel;
+use Logdash\Types\LogLevel;
 
 class Logger
 {
@@ -100,7 +100,7 @@ class Logger
         );
         $formattedMessage = "{$datePrefix} {$prefix}{$message}";
 
-        $logMethod = $this->logMethod ?? function(string $msg): void {
+        $logMethod = $this->logMethod ?? function (string $msg): void {
             file_put_contents(
                 'php://stdout',
                 $msg . PHP_EOL
@@ -123,6 +123,10 @@ class Logger
         return strtoupper($level->value) . ' ';
     }
 
+    /**
+     * @param array<mixed|array|object> $data
+     * @return array<string>
+     */
     private function convertToStrings(array $data): array
     {
         return array_map(function ($item): string {
