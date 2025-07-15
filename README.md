@@ -2,7 +2,7 @@
 
 [![Packagist Version](https://img.shields.io/packagist/v/logdash/php-sdk)](https://packagist.org/packages/logdash/php-sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![PHP Version](https://img.shields.io/badge/PHP-8.2+-blue.svg)](https://php.net)
+[![PHP Version](https://img.shields.io/badge/PHP-8.1+-blue.svg)](https://php.net)
 [![Tests](https://github.com/logdash-io/php-sdk/workflows/Tests/badge.svg)](https://github.com/logdash-io/php-sdk/actions)
 
 > **Official PHP SDK for [Logdash.io](https://logdash.io/) - Zero-configuration observability platform designed for developers working on side projects and prototypes.**
@@ -20,7 +20,7 @@ Most observability solutions feel overwhelming for small projects and prototypes
 - **⚡ Asynchronous**: Non-blocking operations with automatic resource management
 - **🛡️ Production Ready**: Built with enterprise-grade patterns and error handling
 - **🔧 Framework Agnostic**: Works with Laravel, Symfony, or standalone PHP apps
-- **🐘 PHP 8.2+ Compatible**: Supports PHP 8.2, 8.3, and all newer versions
+- **🐘 PHP 8.1+ Compatible**: Supports PHP 8.1, 8.2, 8.3, and all newer versions
 
 ## Pre-requisites
 
@@ -222,7 +222,7 @@ The SDK is designed to be non-blocking and fail silently in production. If there
 
 ## Requirements
 
-- PHP 8.2 or higher
+- PHP 8.1 or higher
 - Guzzle HTTP client (automatically installed via Composer)
 
 ## Development

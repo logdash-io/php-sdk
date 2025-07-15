@@ -1,4 +1,4 @@
-FROM php:cli-alpine AS php-base
+FROM php:8.1-cli-alpine AS php-base
 
 # Install composer
 ENV COMPOSER_ALLOW_SUPERUSER 1

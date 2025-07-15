@@ -10,13 +10,13 @@ class InternalLogger
 {
     private static self $instance;
     private const LOG_LEVEL_COLORS = [
-        LogLevel::ERROR->value => [231, 0, 11],
-        LogLevel::WARN->value => [254, 154, 0],
-        LogLevel::INFO->value => [21, 93, 252],
-        LogLevel::HTTP->value => [0, 166, 166],
-        LogLevel::VERBOSE->value => [0, 166, 0],
-        LogLevel::DEBUG->value => [0, 166, 0],
-        LogLevel::SILLY->value => [80, 80, 80],
+        'error' => [231, 0, 11],
+        'warning' => [254, 154, 0],
+        'info' => [21, 93, 252],
+        'http' => [0, 166, 166],
+        'verbose' => [0, 166, 0],
+        'debug' => [0, 166, 0],
+        'silly' => [80, 80, 80],
     ];
 
     public function log(string ...$data): void

@@ -18,13 +18,14 @@
   ],
   "homepage": "https://github.com/logdash-io/php-sdk",
   "require": {
-    "php": ">=8.2",
+    "php": ">=8.1",
     "guzzlehttp/guzzle": "^7.0"
   },
   "require-dev": {
     "phpunit/phpunit": "^10.0",
     "phpstan/phpstan": "^1.10",
-    "squizlabs/php_codesniffer": "^3.7"
+    "squizlabs/php_codesniffer": "^3.7",
+    "php-parallel-lint/php-parallel-lint": "^1.4"
   },
   "autoload": {
     "psr-4": {
@@ -47,6 +48,7 @@
     "cbf": "phpcbf",
     "qa": {
       "Codestyle": "@cs",
+      "Lint": "parallel-lint src tests",
       "Static analyse": "@phpstan",
       "Tests": "@test"
     },
