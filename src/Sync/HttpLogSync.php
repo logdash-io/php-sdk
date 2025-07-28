@@ -6,7 +6,8 @@ namespace Logdash\Sync;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
-use Logdash\LogLevel;
+use Logdash\Logger\InternalLogger;
+use Logdash\Types\LogLevel;
 use Logdash\Types\RequiredInitializationParams;
 
 class HttpLogSync implements LogSync
@@ -44,7 +45,7 @@ class HttpLogSync implements LogSync
             ]);
         } catch (GuzzleException $e) {
             if ($this->params->verbose) {
-                \Logdash\Logger\getInternalLogger()->verbose("Failed to send log: " . $e->getMessage());
+                InternalLogger::getInternalLogger()->verbose("Failed to send log: " . $e->getMessage());
             }
             // Fail silently in production
         }

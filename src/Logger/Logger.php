@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace Logdash\Logger;
 
-use Logdash\LogLevel;
+use Logdash\Types\LogLevel;
 
 class Logger
 {
     private const LOG_LEVEL_COLORS = [
-        LogLevel::ERROR->value => [231, 0, 11],
-        LogLevel::WARN->value => [254, 154, 0],
-        LogLevel::INFO->value => [21, 93, 252],
-        LogLevel::HTTP->value => [0, 166, 166],
-        LogLevel::VERBOSE->value => [0, 166, 0],
-        LogLevel::DEBUG->value => [0, 166, 0],
-        LogLevel::SILLY->value => [80, 80, 80],
+        'error' => [231, 0, 11],
+        'warning' => [254, 154, 0],
+        'info' => [21, 93, 252],
+        'http' => [0, 166, 166],
+        'verbose' => [0, 166, 0],
+        'debug' => [0, 166, 0],
+        'silly' => [80, 80, 80],
     ];
 
     private readonly mixed $logMethod;
@@ -100,8 +100,11 @@ class Logger
         );
         $formattedMessage = "{$datePrefix} {$prefix}{$message}";
 
-        $logMethod = $this->logMethod ?? function(string $msg): void {
-            echo $msg . PHP_EOL;
+        $logMethod = $this->logMethod ?? function (string $msg): void {
+            file_put_contents(
+                'php://stdout',
+                $msg . PHP_EOL
+            );
         };
 
         $logMethod($formattedMessage);
@@ -120,6 +123,10 @@ class Logger
         return strtoupper($level->value) . ' ';
     }
 
+    /**
+     * @param array<mixed|array|object> $data
+     * @return array<string>
+     */
     private function convertToStrings(array $data): array
     {
         return array_map(function ($item): string {

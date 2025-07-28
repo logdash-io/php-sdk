@@ -7,12 +7,7 @@ namespace Logdash;
 use Logdash\Logger\Logger;
 use Logdash\Metrics\BaseMetrics;
 use Logdash\Types\InitializationParams;
-use Logdash\Types\RequiredInitializationParams;
-
-require_once __DIR__ . '/Types/LogLevel.php';
-require_once __DIR__ . '/Logger/InternalLogger.php';
-require_once __DIR__ . '/Metrics/CreateMetrics.php';
-require_once __DIR__ . '/Sync/CreateLogSync.php';
+use Logdash\Types\LogLevel;
 
 use function Logdash\Metrics\createMetrics;
 use function Logdash\Sync\createLogSync;
@@ -30,6 +25,9 @@ class Logdash
         $this->metrics = $metrics;
     }
 
+    /**
+     * @param array{apiKey?:string, host?:string, verbose?:bool}|null $params
+     */
     public static function create(?array $params = null): self
     {
         $initParams = new InitializationParams(
