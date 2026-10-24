@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace Logdash\Tests;
 
+use GuzzleHttp\Client;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
+use GuzzleHttp\Psr7\Response;
 use Logdash\Logdash;
 use Logdash\Types\LogLevel;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -207,18 +212,99 @@ class LogdashTest extends TestCase
         $this->assertSame(['before', 'from a shutdown function'], array_column($this->sentLogs(), 'message'));
     }
 
-    public function testALogASecondAfterTheOldestSendsTheBuffer(): void
+    public function testALogASecondAfterTheLastSendGoesAtOnce(): void
     {
         $logdash = Logdash::create(['apiKey' => 'test-api-key', 'host' => self::$host]);
 
-        $logdash->logger()->info('first');
         usleep(1_000_000);
+        $logdash->logger()->info('after a second idle');
 
-        $this->assertSame([], $this->sentLogs());
+        // A worker that logs once in a while sends each log, rather than keeping it until the next one
+        $this->assertSame(['after a second idle'], array_column($this->sentLogs(), 'message'));
 
-        $logdash->logger()->info('a second later');
+        $logdash->logger()->info('right after');
 
-        $this->assertSame(['first', 'a second later'], array_column($this->sentLogs(), 'message'));
+        $this->assertSame(['after a second idle'], array_column($this->sentLogs(), 'message'));
+    }
+
+    public function testBatchesStayUnderTheApiBodyLimit(): void
+    {
+        $logdash = Logdash::create(['apiKey' => 'test-api-key', 'host' => self::$host]);
+
+        // 4 bytes each, and the API keeps the first 4096 characters
+        for ($i = 0; $i < 100; $i++) {
+            $logdash->logger()->info(str_repeat("\u{1F600}", 5000));
+        }
+        $logdash->flush();
+
+        $batches = $this->receivedBodies('POST /logs/batch');
+
+        $this->assertGreaterThan(1, count($batches));
+        $this->assertCount(100, $this->sentLogs());
+
+        foreach ($batches as $batch) {
+            $this->assertLessThan(2_000_000, strlen(json_encode($batch, JSON_UNESCAPED_UNICODE)));
+        }
+
+        foreach ($this->sentLogs() as $log) {
+            $this->assertSame(str_repeat("\u{1F600}", 4096), $log['message']);
+        }
+    }
+
+    public function testAMessageIsCutAt4096CharactersAndKeepsBadUtf8ForSubstitution(): void
+    {
+        $logdash = Logdash::create(['apiKey' => 'test-api-key', 'host' => self::$host]);
+
+        $logdash->logger()->info(str_repeat('a', 5000));
+        $logdash->logger()->info("\xe9" . str_repeat('é', 5000));
+        $logdash->flush();
+
+        $this->assertSame(
+            [str_repeat('a', 4096), "\u{fffd}" . str_repeat('é', 4095)],
+            array_column($this->sentLogs(), 'message')
+        );
+    }
+
+    public function testAnHttpClientCanBeInjected(): void
+    {
+        $history = [];
+        $handler = HandlerStack::create(new MockHandler([new Response(200)]));
+        $handler->push(Middleware::history($history));
+        $logdash = Logdash::create([
+            'apiKey' => 'test-api-key',
+            'host' => 'https://test.logdash.io',
+            'httpClient' => new Client(['handler' => $handler]),
+        ]);
+
+        $logdash->logger()->info('Test info');
+        $logdash->flush();
+
+        $this->assertCount(1, $history);
+        $request = $history[0]['request'];
+        $this->assertSame('https://test.logdash.io/logs/batch', (string) $request->getUri());
+        $this->assertSame('test-api-key', $request->getHeaderLine('project-api-key'));
+        $this->assertSame('application/json', $request->getHeaderLine('Content-Type'));
+    }
+
+    public function testAForkedChildDoesNotSendItsParentsBuffer(): void
+    {
+        if (!function_exists('pcntl_fork')) {
+            $this->markTestSkipped('Needs pcntl');
+        }
+
+        $this->printedBy(sprintf(
+            '$logdash = Logdash\Logdash::create(%s);
+            $logdash->metrics()->mutate("jobs", 1);
+            if (pcntl_fork() === 0) {
+                $logdash->logger()->info("from the child");
+                exit;
+            }
+            pcntl_wait($status);',
+            var_export(['apiKey' => 'test-api-key', 'host' => self::$host], true)
+        ));
+
+        $this->assertSame(['from the child'], array_column($this->sentLogs(), 'message'));
+        $this->assertCount(1, $this->receivedRequests('PUT /metrics'), 'The parent sends its mutate once');
     }
 
     public function testMetricUpdatesMergeTheWayTheApiMergesThem(): void

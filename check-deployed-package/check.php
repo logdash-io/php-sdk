@@ -50,6 +50,8 @@ foreach (
 }
 
 $logdash->metrics()->set('users', $users);
+// Buffered together, a set and a mutate merge into one set, and the API would never get a change
+$logdash->flush();
 $logdash->metrics()->mutate('users', 1);
 // The end of this script would send them too, but they must be there to read back
 $logdash->flush();

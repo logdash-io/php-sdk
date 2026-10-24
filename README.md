@@ -161,13 +161,14 @@ Creates a new Logdash instance.
 - `host` (string, optional): Logdash API host. Defaults to `https://api.logdash.io`
 - `verbose` (bool, optional): Enable verbose internal logging. Defaults to `false`
 - `app` (string, optional): Name of this app within its domain, sent with every log, metric and event. See [Apps](#apps)
+- `httpClient` (`GuzzleHttp\ClientInterface`, optional): Client that sends the requests to the API, such as one with a proxy. Defaults to a client with a 5 second timeout
 
 #### `flush(): void`
 
 Sends the logs, metrics and events buffered so far, and waits for the API.
 
 Logdash buffers them and sends them together, so that a log costs no HTTP request of its own.
-It sends them when 100 are buffered, when one comes a second or more after the oldest, and when the PHP request or script ends.
+It sends them when 100 are buffered, when the logs near the API's 2 MB request limit, when one comes a second or more after the last send, and when the PHP request or script ends.
 Call `flush()` where the process lives on, such as in a queue worker after each job:
 
 ```php

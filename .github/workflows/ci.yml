@@ -65,7 +65,8 @@ jobs:
     env:
       V: ${{ needs.version.outputs.next }}
     steps:
-      - run: gh release create "v$V" --generate-notes --target "$GITHUB_SHA"
+      # Skipped when a rerun after a failed step below finds the release already made
+      - run: gh release view "v$V" >/dev/null 2>&1 || gh release create "v$V" --generate-notes --target "$GITHUB_SHA"
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

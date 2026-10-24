@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Logdash;
 
+use GuzzleHttp\ClientInterface;
 use Logdash\Events\Events;
 use Logdash\Logger\Logger;
 use Logdash\Metrics\BaseMetrics;
@@ -34,7 +35,8 @@ class Logdash
     }
 
     /**
-     * @param array{apiKey?:string, host?:string, verbose?:bool, app?:string}|null $params
+     * @param array{apiKey?:string, host?:string, verbose?:bool, app?:string, httpClient?:ClientInterface}|null $params
+     *     httpClient sends the requests to the API, such as one with a proxy or a mock in tests
      */
     public static function create(?array $params = null): self
     {
@@ -47,7 +49,7 @@ class Logdash
 
         $requiredParams = $initParams->toRequired();
         // One queue sends the logs, metrics and events of this instance together
-        $queue = new RequestQueue($requiredParams);
+        $queue = new RequestQueue($requiredParams, $params['httpClient'] ?? null);
         $logSync = createLogSync($requiredParams, $queue);
         $metrics = createMetrics($requiredParams, $queue);
 

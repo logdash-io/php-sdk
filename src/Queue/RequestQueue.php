@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Logdash\Queue;
 
 use GuzzleHttp\Client;
-use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\ClientInterface;
+use GuzzleHttp\Exception\ServerException;
 use GuzzleHttp\Pool;
 use Logdash\Logger\InternalLogger;
 use Logdash\Metrics\MetricOperation;
@@ -13,16 +14,20 @@ use Logdash\Types\RequiredInitializationParams;
 use Throwable;
 
 /**
- * Buffers logs, metrics and events and sends them together, concurrently: when 100 are buffered,
- * when one comes a second or more after the oldest, when the PHP request or script ends, and on flush()
+ * Buffers logs, metrics and events and sends them together, concurrently: when 100 are buffered, when the logs
+ * near the API's 2 MB body limit, when one comes a second or more after the last send, when the PHP request or
+ * script ends, and on flush()
  */
 final class RequestQueue
 {
     // POST /logs/batch takes up to 100 logs
     private const MAX_BUFFERED = 100;
-    // ponytail: checked only when one more comes, so an idle worker keeps the rest until flush() or its exit;
-    // sending them on time needs a timer, from pcntl or an event loop
+    // Under the API's 2 MB body limit, with room for the batch around the logs
+    private const MAX_LOG_BYTES = 1_500_000;
+    // ponytail: checked only when one more comes, so a burst within a second of the last send waits for the next one,
+    // flush() or the exit; sending them on time needs a timer, from pcntl or an event loop
     private const MAX_AGE_NANOSECONDS = 1_000_000_000;
+    private const JSON_FLAGS = JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE;
     private const CONCURRENCY = 10;
     private const RETRY_DELAY_MICROSECONDS = 200_000;
 
@@ -32,22 +37,23 @@ final class RequestQueue
     private array $metrics = [];
     /** @var list<array<string, mixed>> */
     private array $events = [];
-    private ?int $oldestAt = null;
+    private int $logBytes = 0;
+    private int $lastFlushAt;
     private bool $flushesAtShutdown = false;
-    private Client $httpClient;
+    private int $pid;
+    private ClientInterface $httpClient;
 
     public function __construct(
-        private readonly RequiredInitializationParams $params
+        private readonly RequiredInitializationParams $params,
+        ?ClientInterface $httpClient = null
     ) {
-        $this->httpClient = new Client([
+        $this->httpClient = $httpClient ?? new Client([
             // An unreachable API fails in 2 seconds instead of the whole timeout
             'connect_timeout' => 2,
             'timeout' => 5,
-            'headers' => [
-                'Content-Type' => 'application/json',
-                'project-api-key' => $params->apiKey,
-            ],
         ]);
+        $this->lastFlushAt = hrtime(true);
+        $this->pid = (int) getmypid();
     }
 
     /**
@@ -55,7 +61,15 @@ final class RequestQueue
      */
     public function log(array $log): void
     {
+        $this->dropIfForked();
+        $bytes = strlen((string) json_encode($log, self::JSON_FLAGS)) + 1;
+
+        if ($this->logs !== [] && $this->logBytes + $bytes > self::MAX_LOG_BYTES) {
+            $this->flush();
+        }
+
         $this->logs[] = $log;
+        $this->logBytes += $bytes;
         $this->buffered();
     }
 
@@ -64,6 +78,7 @@ final class RequestQueue
      */
     public function metric(array $metric): void
     {
+        $this->dropIfForked();
         // Merged the way the API merges the updates it buffers: a set replaces the update, a change adds to it.
         // As one request, the updates of a metric cannot arrive out of order.
         $update = $this->metrics[$metric['name']] ?? null;
@@ -78,6 +93,7 @@ final class RequestQueue
      */
     public function event(array $event): void
     {
+        $this->dropIfForked();
         $this->events[] = $event;
         $this->buffered();
     }
@@ -87,7 +103,9 @@ final class RequestQueue
      */
     public function flush(): void
     {
-        // Logs and events that fail get one retry: the API stores an event once per id.
+        $this->dropIfForked();
+        // Logs and events that get a 5xx get one retry: the API stores an event once per id.
+        // A timeout gets none: the API may have stored the batch, and a retry would double the wait.
         // Metrics get none: a change the API applied before the connection broke would apply twice.
         $requests = [
             ...($this->logs === [] ? [] : [['POST', '/logs/batch', ['logs' => $this->logs], true]]),
@@ -98,7 +116,8 @@ final class RequestQueue
             ...array_map(fn (array $event): array => ['POST', '/events', $event, true], $this->events),
         ];
         $this->logs = $this->metrics = $this->events = [];
-        $this->oldestAt = null;
+        $this->logBytes = 0;
+        $this->lastFlushAt = hrtime(true);
 
         $retries = array_filter($this->send($requests), fn (array $request): bool => $request[3]);
 
@@ -119,13 +138,23 @@ final class RequestQueue
             });
         }
 
-        $this->oldestAt ??= hrtime(true);
-
         if (
             count($this->logs) + count($this->metrics) + count($this->events) >= self::MAX_BUFFERED
-            || hrtime(true) - $this->oldestAt >= self::MAX_AGE_NANOSECONDS
+            || hrtime(true) - $this->lastFlushAt >= self::MAX_AGE_NANOSECONDS
         ) {
             $this->flush();
+        }
+    }
+
+    /**
+     * A child of pcntl_fork() starts with its parent's buffer, which the parent sends itself
+     */
+    private function dropIfForked(): void
+    {
+        if ($this->pid !== getmypid()) {
+            $this->pid = (int) getmypid();
+            $this->logs = $this->metrics = $this->events = [];
+            $this->logBytes = 0;
         }
     }
 
@@ -135,7 +164,7 @@ final class RequestQueue
      * @param array<int, array{string, string, array<string, mixed>, bool}> $requests The method, path and body
      *     of each, and whether it gets a retry
      * @return array<int, array{string, string, array<string, mixed>, bool}> Those that failed for a reason that
-     *     can pass, such as a timeout or a 5xx
+     *     can pass: a 5xx
      */
     private function send(array $requests): array
     {
@@ -143,7 +172,7 @@ final class RequestQueue
 
         foreach ($requests as $index => [$method, $path, $body]) {
             // Bad UTF-8 becomes U+FFFD, so that one log does not cost its whole batch
-            $json = json_encode($body, JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE);
+            $json = json_encode($body, self::JSON_FLAGS);
 
             if ($json === false) {
                 // A metric or event prop of INF or NAN, which JSON has no number for
@@ -153,6 +182,7 @@ final class RequestQueue
 
             $sends[$index] = fn () => $this->httpClient->requestAsync($method, $this->params->host . $path, [
                 'body' => $json,
+                'headers' => ['Content-Type' => 'application/json', 'project-api-key' => $this->params->apiKey],
             ]);
         }
 
@@ -165,7 +195,7 @@ final class RequestQueue
                     $this->verbose('Failed to send: ' . $reason->getMessage());
 
                     // A 4xx, such as a rate limit, would answer a retry the same
-                    if (!$reason instanceof ClientException) {
+                    if ($reason instanceof ServerException) {
                         $failed[$index] = $requests[$index];
                     }
                 },
