@@ -49,6 +49,7 @@ class Metrics implements BaseMetrics
                     'name' => $name,
                     'value' => $value,
                     'operation' => $operation->value,
+                    ...($this->params->app === null ? [] : ['app' => $this->params->app]),
                 ],
                 'timeout' => 5,
             ]);

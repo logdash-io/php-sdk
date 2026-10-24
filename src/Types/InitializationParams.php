@@ -9,16 +9,20 @@ class InitializationParams
     public function __construct(
         public readonly ?string $apiKey = null,
         public readonly string $host = 'https://api.logdash.io',
-        public readonly bool $verbose = false
+        public readonly bool $verbose = false,
+        public readonly ?string $app = null
     ) {
     }
 
     public function toRequired(): RequiredInitializationParams
     {
+        $app = trim($this->app ?? '');
+
         return new RequiredInitializationParams(
             apiKey: $this->apiKey ?? '',
             host: $this->host,
-            verbose: $this->verbose
+            verbose: $this->verbose,
+            app: $app === '' ? null : $app
         );
     }
 }

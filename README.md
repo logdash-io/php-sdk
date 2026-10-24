@@ -85,6 +85,21 @@ $metrics->mutate('login_count', 1); // Increment by 1
 $metrics->mutate('error_count', -1); // Decrement by 1
 ```
 
+### Apps
+
+A domain has one API key, the domain key, shared by all apps of that domain, for example a desktop app, an API and a landing page.
+Set `app` to name this one, so the dashboard can filter logs and metrics by app:
+
+```php
+$logdash = Logdash::create([
+    'apiKey' => 'your-domain-key',
+    'app' => 'api'
+]);
+```
+
+Every log and metric sent by this instance carries the app.
+Older service keys ignore `app`.
+
 ### Framework Integration
 
 #### Laravel
@@ -145,6 +160,7 @@ Creates a new Logdash instance.
 - `apiKey` (string, optional): Your Logdash API key. If not provided, only local logging will work
 - `host` (string, optional): Logdash API host. Defaults to `https://api.logdash.io`
 - `verbose` (bool, optional): Enable verbose internal logging. Defaults to `false`
+- `app` (string, optional): Name of this app within its domain, sent with every log and metric. See [Apps](#apps)
 
 ### Logger
 

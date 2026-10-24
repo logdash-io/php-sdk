@@ -40,6 +40,7 @@ class HttpLogSync implements LogSync
                     'level' => $level->value,
                     'createdAt' => $createdAt,
                     'sequenceNumber' => $this->sequenceNumber++,
+                    ...($this->params->app === null ? [] : ['app' => $this->params->app]),
                 ],
                 'timeout' => 5,
             ]);
