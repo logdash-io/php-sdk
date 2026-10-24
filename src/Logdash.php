@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Logdash;
 
+use GuzzleHttp\ClientInterface;
 use Logdash\Events\Events;
 use Logdash\Logger\Logger;
 use Logdash\Metrics\BaseMetrics;
+use Logdash\Queue\RequestQueue;
 use Logdash\Types\InitializationParams;
 use Logdash\Types\LogLevel;
 
@@ -18,19 +20,23 @@ class Logdash
     private Logger $logger;
     private BaseMetrics $metrics;
     private Events $events;
+    private RequestQueue $queue;
 
     private function __construct(
         Logger $logger,
         BaseMetrics $metrics,
-        Events $events
+        Events $events,
+        RequestQueue $queue
     ) {
         $this->logger = $logger;
         $this->metrics = $metrics;
         $this->events = $events;
+        $this->queue = $queue;
     }
 
     /**
-     * @param array{apiKey?:string, host?:string, verbose?:bool, app?:string}|null $params
+     * @param array{apiKey?:string, host?:string, verbose?:bool, app?:string, httpClient?:ClientInterface}|null $params
+     *     httpClient sends the requests to the API, such as one with a proxy or a mock in tests
      */
     public static function create(?array $params = null): self
     {
@@ -42,8 +48,10 @@ class Logdash
         );
 
         $requiredParams = $initParams->toRequired();
-        $logSync = createLogSync($requiredParams);
-        $metrics = createMetrics($requiredParams);
+        // One queue sends the logs, metrics and events of this instance together
+        $queue = new RequestQueue($requiredParams, $params['httpClient'] ?? null);
+        $logSync = createLogSync($requiredParams, $queue);
+        $metrics = createMetrics($requiredParams, $queue);
 
         $logger = new Logger(
             logMethod: null,
@@ -53,7 +61,7 @@ class Logdash
             }
         );
 
-        return new self($logger, $metrics, new Events($requiredParams));
+        return new self($logger, $metrics, new Events($requiredParams, $queue), $queue);
     }
 
     public function logger(): Logger
@@ -76,5 +84,14 @@ class Logdash
     public function track(string $name, array $props = [], string|int|null $userId = null): void
     {
         $this->events->track($name, $props, $userId);
+    }
+
+    /**
+     * Sends the logs, metrics and events buffered so far and waits for the API, never throws.
+     * A PHP request or script sends them when it ends, so call this where the process lives on, such as after a job.
+     */
+    public function flush(): void
+    {
+        $this->queue->flush();
     }
 }

@@ -12,3 +12,8 @@ file_put_contents(
     ]) . PHP_EOL,
     FILE_APPEND
 );
+
+// Answers with the status on the first line of LOGDASH_STATUSES_FILE, which it removes, or 200 when there is none
+$statuses = file(getenv('LOGDASH_STATUSES_FILE'), FILE_IGNORE_NEW_LINES);
+http_response_code((int) (array_shift($statuses) ?? 200));
+file_put_contents(getenv('LOGDASH_STATUSES_FILE'), implode(PHP_EOL, $statuses));

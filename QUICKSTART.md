@@ -129,12 +129,6 @@ Run the examples:
 php examples.php
 ```
 
-Run the test script:
-
-```bash
-php test.php
-```
-
 ## Next Steps
 
 1. Explore the [examples.php](examples.php) file for more usage patterns

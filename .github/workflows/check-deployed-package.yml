@@ -1,31 +1,28 @@
 name: Check deployed package
 
+# Installs logdash/php-sdk from Packagist and checks that its logs and metrics reach Logdash, see check-deployed-package.
+# CI runs it after each release; run it by hand on any branch to check a version, by default the latest.
 on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
   workflow_dispatch:
-  workflow_run:
-    workflows: ["Publish Package to packagist"]
-    types:
-      - completed
-    branches:
-      - main
+    inputs:
+      version:
+        description: The version to check, such as 1.1.0; empty checks the latest
+        required: false
 
 jobs:
   check-deployed-package:
-    name: Check deployed package
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Wait for package to propagate to Packagist
-        run: sleep 120
-
-      - name: Make run script executable
-        run: chmod +x check-deployed-package/run.sh
-
-      - name: Check deployed package
+      - uses: actions/checkout@v7
+      - run: ./check-deployed-package/run.sh
         env:
+          VERSION: ${{ inputs.version }}
+          # Sends the logs and metrics: the ingest key of the SDK smoke tests domain
           LOGDASH_API_KEY: ${{ secrets.LOGDASH_API_KEY }}
-        run: ./check-deployed-package/run.sh
+          # Reads them back: an ldp_ key with logs:read and metrics:read, restricted to that domain
+          LOGDASH_PERSONAL_API_KEY: ${{ secrets.LOGDASH_PERSONAL_API_KEY }}

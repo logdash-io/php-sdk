@@ -4,51 +4,56 @@ declare(strict_types=1);
 
 namespace Logdash\Sync;
 
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\GuzzleException;
-use Logdash\Logger\InternalLogger;
+use Logdash\Queue\RequestQueue;
 use Logdash\Types\LogLevel;
 use Logdash\Types\RequiredInitializationParams;
 
 class HttpLogSync implements LogSync
 {
+    // The API keeps the first 4096 characters of a message
+    private const MAX_MESSAGE_CHARACTERS = 4096;
+
     private int $sequenceNumber = 0;
-    private Client $httpClient;
+    private RequestQueue $queue;
 
     public function __construct(
-        private readonly RequiredInitializationParams $params
+        private readonly RequiredInitializationParams $params,
+        ?RequestQueue $queue = null
     ) {
-        $this->httpClient = new Client();
+        $this->queue = $queue ?? new RequestQueue($params);
+    }
+
+    public function send(string $message, LogLevel $level, string $createdAt): void
+    {
+        $this->queue->log([
+            'message' => self::cut($message),
+            'level' => $level->value,
+            'createdAt' => $createdAt,
+            'sequenceNumber' => $this->sequenceNumber++,
+            ...($this->params->app === null ? [] : ['app' => $this->params->app]),
+        ]);
     }
 
     /**
-     * TODO:
-     * - queue
-     * - retry
-     * - batching
+     * The first 4096 characters of $message, without mbstring, which PHP may lack
      */
-    public function send(string $message, LogLevel $level, string $createdAt): void
+    private static function cut(string $message): string
     {
-        try {
-            $this->httpClient->post($this->params->host . '/logs', [
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'project-api-key' => $this->params->apiKey,
-                ],
-                'json' => [
-                    'message' => $message,
-                    'level' => $level->value,
-                    'createdAt' => $createdAt,
-                    'sequenceNumber' => $this->sequenceNumber++,
-                    ...($this->params->app === null ? [] : ['app' => $this->params->app]),
-                ],
-                'timeout' => 5,
-            ]);
-        } catch (GuzzleException $e) {
-            if ($this->params->verbose) {
-                InternalLogger::getInternalLogger()->verbose("Failed to send log: " . $e->getMessage());
-            }
-            // Fail silently in production
+        if (strlen($message) <= self::MAX_MESSAGE_CHARACTERS) {
+            return $message;
         }
+
+        // A character is a byte and the UTF-8 continuation bytes after it, so bad UTF-8 stays as it is for
+        // json_encode to replace
+        $length = strlen($message);
+        $cut = 0;
+
+        for ($characters = 0; $characters < self::MAX_MESSAGE_CHARACTERS && $cut < $length; $characters++) {
+            do {
+                $cut++;
+            } while ($cut < $length && (ord($message[$cut]) & 0xC0) === 0x80);
+        }
+
+        return substr($message, 0, $cut);
     }
 }

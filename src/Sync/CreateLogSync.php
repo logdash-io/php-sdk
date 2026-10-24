@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Logdash\Sync;
 
+use Logdash\Queue\RequestQueue;
 use Logdash\Types\RequiredInitializationParams;
 
-function createLogSync(RequiredInitializationParams $params): LogSync
+function createLogSync(RequiredInitializationParams $params, ?RequestQueue $queue = null): LogSync
 {
     if (empty($params->apiKey)) {
         \Logdash\Logger\InternalLogger::getInternalLogger()->log(
@@ -16,5 +17,5 @@ function createLogSync(RequiredInitializationParams $params): LogSync
         return new NoopLogSync();
     }
 
-    return new HttpLogSync($params);
+    return new HttpLogSync($params, $queue);
 }
