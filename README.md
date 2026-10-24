@@ -97,7 +97,7 @@ $logdash = Logdash::create([
 ]);
 ```
 
-Every log and metric sent by this instance carries the app.
+Every log, metric and event sent by this instance carries the app.
 Older service keys ignore `app`.
 
 ### Framework Integration
@@ -157,10 +157,10 @@ Creates a new Logdash instance.
 
 **Parameters:**
 
-- `apiKey` (string, optional): Your Logdash API key. If not provided, only local logging will work
+- `apiKey` (string, optional): Your Logdash API key. If not provided, logs and events are only printed locally
 - `host` (string, optional): Logdash API host. Defaults to `https://api.logdash.io`
 - `verbose` (bool, optional): Enable verbose internal logging. Defaults to `false`
-- `app` (string, optional): Name of this app within its domain, sent with every log and metric. See [Apps](#apps)
+- `app` (string, optional): Name of this app within its domain, sent with every log, metric and event. See [Apps](#apps)
 
 ### Logger
 
@@ -195,6 +195,31 @@ $metrics->mutate('request_count', 1);    // Increment
 $metrics->mutate('error_count', -1);     // Decrement
 $metrics->mutate('temperature', 2.5);    // Increase by 2.5
 ```
+
+### Events
+
+#### `track(string $name, array $props = [], string|int|null $userId = null): void`
+
+Track an event, such as an agent run or a signup.
+
+```php
+$logdash->track('agent_run', [
+    'agent' => 'support',
+    'steps' => 4,
+    'success' => true,
+], $user->id);
+```
+
+Events show up in the domain's Analytics as goals, with a daily trend.
+Pass the user ID for signed-in users, so one person counts once across the website and apps.
+Without it, Logdash counts a visitor of that app that changes every day.
+Never put personal data in props.
+
+**Parameters:**
+
+- `name` (string): The event name, matching `[a-z][a-z0-9_]{0,63}`, except `pageview`, `pageleave` and `browser_error`, which belong to the website tracker. An invalid name drops the event with a warning
+- `props` (array, optional): Up to 10 properties with string, number or boolean values
+- `userId` (string|int, optional): The signed-in user's internal ID, never an email address. An ID that contains `@` drops the event with a warning
 
 ## Log Levels
 
