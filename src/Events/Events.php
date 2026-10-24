@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace Logdash\Events;
 
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\GuzzleException;
 use Logdash\Logger\InternalLogger;
+use Logdash\Queue\RequestQueue;
 use Logdash\Types\RequiredInitializationParams;
 
 class Events
@@ -15,12 +14,13 @@ class Events
     // Belong to the website tracker, so the API rejects them
     private const WEBSITE_EVENTS = ['pageview', 'pageleave', 'browser_error'];
 
-    private Client $httpClient;
+    private RequestQueue $queue;
 
     public function __construct(
-        private readonly RequiredInitializationParams $params
+        private readonly RequiredInitializationParams $params,
+        ?RequestQueue $queue = null
     ) {
-        $this->httpClient = new Client();
+        $this->queue = $queue ?? new RequestQueue($params);
     }
 
     /**
@@ -63,22 +63,8 @@ class Events
             InternalLogger::getInternalLogger()->verbose("Tracking event {$name}");
         }
 
-        try {
-            $this->httpClient->post($this->params->host . '/events', [
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'project-api-key' => $this->params->apiKey,
-                ],
-                // The API stores an event once per id, so a retry must send the same one
-                'json' => ['id' => self::uuidV4()] + $event,
-                'timeout' => 5,
-            ]);
-        } catch (GuzzleException $e) {
-            if ($this->params->verbose) {
-                InternalLogger::getInternalLogger()->verbose("Failed to send event: " . $e->getMessage());
-            }
-            // Fail silently in production
-        }
+        // The API stores an event once per id, so a retry must send the same one
+        $this->queue->event(['id' => self::uuidV4()] + $event);
     }
 
     private static function uuidV4(): string

@@ -4,7 +4,7 @@
 /.gitignore export-ignore
 /compose.yaml export-ignore
 /README.md export-ignore
-/phpunit.xml.dist export-ignore
+/phpunit.xml export-ignore
 /tests export-ignore
 /QUICKSTART.md export-ignore
 /phpstan.neon export-ignore
@@ -13,3 +13,5 @@
 /CHANGELOG.md export-ignore
 /examples.php export-ignore
 /qodana.yaml export-ignore
+/scripts export-ignore
+/check-deployed-package export-ignore

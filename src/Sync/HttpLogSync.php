@@ -4,51 +4,34 @@ declare(strict_types=1);
 
 namespace Logdash\Sync;
 
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\GuzzleException;
-use Logdash\Logger\InternalLogger;
+use Logdash\Queue\RequestQueue;
 use Logdash\Types\LogLevel;
 use Logdash\Types\RequiredInitializationParams;
 
 class HttpLogSync implements LogSync
 {
+    // The API keeps the first 4096 characters of a message, at most 16 KB of UTF-8.
+    // Cut there, a batch of 100 logs stays under its 2 MB limit.
+    private const MAX_MESSAGE_BYTES = 16_384;
+
     private int $sequenceNumber = 0;
-    private Client $httpClient;
+    private RequestQueue $queue;
 
     public function __construct(
-        private readonly RequiredInitializationParams $params
+        private readonly RequiredInitializationParams $params,
+        ?RequestQueue $queue = null
     ) {
-        $this->httpClient = new Client();
+        $this->queue = $queue ?? new RequestQueue($params);
     }
 
-    /**
-     * TODO:
-     * - queue
-     * - retry
-     * - batching
-     */
     public function send(string $message, LogLevel $level, string $createdAt): void
     {
-        try {
-            $this->httpClient->post($this->params->host . '/logs', [
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'project-api-key' => $this->params->apiKey,
-                ],
-                'json' => [
-                    'message' => $message,
-                    'level' => $level->value,
-                    'createdAt' => $createdAt,
-                    'sequenceNumber' => $this->sequenceNumber++,
-                    ...($this->params->app === null ? [] : ['app' => $this->params->app]),
-                ],
-                'timeout' => 5,
-            ]);
-        } catch (GuzzleException $e) {
-            if ($this->params->verbose) {
-                InternalLogger::getInternalLogger()->verbose("Failed to send log: " . $e->getMessage());
-            }
-            // Fail silently in production
-        }
+        $this->queue->log([
+            'message' => substr($message, 0, self::MAX_MESSAGE_BYTES),
+            'level' => $level->value,
+            'createdAt' => $createdAt,
+            'sequenceNumber' => $this->sequenceNumber++,
+            ...($this->params->app === null ? [] : ['app' => $this->params->app]),
+        ]);
     }
 }

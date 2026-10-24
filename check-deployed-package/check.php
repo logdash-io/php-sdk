@@ -2,45 +2,94 @@
 
 declare(strict_types=1);
 
+// Sends logs and metrics with the logdash/php-sdk that the Dockerfile installs, then reads them back from Logdash
 require_once __DIR__ . '/vendor/autoload.php';
 
+use GuzzleHttp\Client;
 use Logdash\Logdash;
 
+function fail(string $message): never
+{
+    fwrite(STDERR, "Error: {$message}" . PHP_EOL);
+    exit(1);
+}
+
+// Such as a 401 from whoami for a personal API key that is wrong, or revoked
+set_exception_handler(fn (Throwable $e) => fail($e->getMessage()));
+
+$apiKey = getenv('LOGDASH_API_KEY') ?: fail('Set LOGDASH_API_KEY to the API key of the smoke-test project');
+$personalApiKey = getenv('LOGDASH_PERSONAL_API_KEY') ?: fail(
+    'Set LOGDASH_PERSONAL_API_KEY to an ldp_ key with logs:read and metrics:read, restricted to the smoke-test project'
+);
+
+$seed = bin2hex(random_bytes(8));
+$users = random_int(1, 1_000_000);
+
 echo "=== Logdash PHP SDK package check ===" . PHP_EOL;
+echo "Sending a log of each level with seed {$seed}, setting users to {$users} and adding 1" . PHP_EOL;
 
-$apiKey = getenv('LOGDASH_API_KEY') ?: null;
-$logsSeed = getenv('LOGS_SEED') ?: 'default';
-$metricsSeed = getenv('METRICS_SEED') ?: '1';
+$logdash = Logdash::create(['apiKey' => $apiKey, 'verbose' => true]);
+$sent = [];
 
-echo "Using API Key: " . ($apiKey ? '[REDACTED]' : 'none') . PHP_EOL;
-echo "Using Logs Seed: {$logsSeed}" . PHP_EOL;
-echo "Using Metrics Seed: {$metricsSeed}" . PHP_EOL;
+foreach (
+    [
+        'info' => 'info',
+        'error' => 'error',
+        'warn' => 'warning',
+        'debug' => 'debug',
+        'http' => 'http',
+        'silly' => 'silly',
+        'verbose' => 'verbose',
+    ] as $method => $level
+) {
+    $message = "This is the {$level} log {$seed}";
+    $logdash->logger()->{$method}($message);
+    $sent[$message] = $level;
+}
 
-// Create Logdash instance
-$logdash = Logdash::create($apiKey ? [
-    'apiKey' => $apiKey,
-    'verbose' => true
-] : []);
+$logdash->metrics()->set('users', $users);
+$logdash->metrics()->mutate('users', 1);
+// The end of this script would send them too, but they must be there to read back
+$logdash->flush();
 
-$logger = $logdash->logger();
-$metrics = $logdash->metrics();
+$api = new Client([
+    'base_uri' => 'https://api.logdash.io',
+    'headers' => ['Authorization' => "Bearer {$personalApiKey}"],
+    'timeout' => 10,
+]);
+$get = fn (string $path, array $query = []): array => json_decode(
+    (string) $api->get($path, ['query' => $query])->getBody(),
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
 
-// Log messages with seed appended
-$logger->info("This is an info log {$logsSeed}");
-$logger->error("This is an error log {$logsSeed}");
-$logger->warn("This is a warning log {$logsSeed}");
-$logger->debug("This is a debug log {$logsSeed}");
-$logger->http("This is a http log {$logsSeed}");
-$logger->silly("This is a silly log {$logsSeed}");
-$logger->verbose("This is a verbose log {$logsSeed}");
+// The key reads only the smoke-test project, which whoami names
+$access = $get('/personal-api-keys/whoami')['access'];
 
-// Set and mutate metrics with seed
-$metricsSeedValue = (float) $metricsSeed;
-$metrics->set('users', $metricsSeedValue);
-$metrics->mutate('users', 1.0);
+if ($access['kind'] !== 'projects' || count($access['ids']) !== 1) {
+    fail('LOGDASH_PERSONAL_API_KEY must be restricted to the smoke-test project, its access is ' . json_encode($access));
+}
 
-// Wait to ensure data is sent
-echo "Waiting 5 seconds to ensure data is sent..." . PHP_EOL;
-sleep(5);
+$projectId = $access['ids'][0];
+echo "Reading them back from project {$projectId}" . PHP_EOL;
 
-echo "Demo completed!" . PHP_EOL;
+// The API stores what it gets every second
+for ($attempt = 1; $attempt <= 30; $attempt++) {
+    sleep(2);
+    $logs = $get("/projects/{$projectId}/logs/v2", ['limit' => 100, 'searchString' => $seed]);
+    $found = array_column($logs, 'level', 'message');
+    $value = array_column($get("/projects/{$projectId}/metrics"), 'value', 'name')['users'] ?? null;
+
+    if ($found == $sent && $value == $users + 1) {
+        echo "Found every log with its level, and users at {$value}" . PHP_EOL;
+        exit(0);
+    }
+}
+
+$missing = array_keys(array_diff_assoc($sent, $found));
+
+fail('After a minute, Logdash ' . implode(' and ', array_filter([
+    $missing === [] ? '' : 'lacks these logs at their level: ' . json_encode($missing),
+    $value == $users + 1 ? '' : 'has users at ' . var_export($value, true) . ' instead of ' . ($users + 1),
+])));

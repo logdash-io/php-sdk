@@ -17,11 +17,13 @@ class LogdashTest extends TestCase
     private static $server;
     private static string $host;
     private static string $requestsFile;
+    private static string $statusesFile;
 
     public static function setUpBeforeClass(): void
     {
         // A local server that records every request the SDK sends to it, see tests/server.php
         self::$requestsFile = tempnam(sys_get_temp_dir(), 'logdash');
+        self::$statusesFile = tempnam(sys_get_temp_dir(), 'logdash');
         $socket = stream_socket_server('tcp://127.0.0.1:0');
         $address = stream_socket_get_name($socket, false);
         fclose($socket);
@@ -32,7 +34,7 @@ class LogdashTest extends TestCase
             [['null'], ['null'], ['null']],
             $pipes,
             null,
-            ['LOGDASH_REQUESTS_FILE' => self::$requestsFile] + getenv()
+            ['LOGDASH_REQUESTS_FILE' => self::$requestsFile, 'LOGDASH_STATUSES_FILE' => self::$statusesFile] + getenv()
         );
 
         for ($attempt = 0; $attempt < 100 && @stream_socket_client("tcp://{$address}") === false; $attempt++) {
@@ -45,11 +47,13 @@ class LogdashTest extends TestCase
         proc_terminate(self::$server);
         proc_close(self::$server);
         unlink(self::$requestsFile);
+        unlink(self::$statusesFile);
     }
 
     protected function setUp(): void
     {
         file_put_contents(self::$requestsFile, '');
+        file_put_contents(self::$statusesFile, '');
     }
 
     public function testCreateWithoutApiKey(): void
@@ -104,15 +108,18 @@ class LogdashTest extends TestCase
         $this->assertTrue(true); // If we get here, no exceptions were thrown
     }
 
-    public function testLoggingInvalidUtf8InAnArrayDoesNotThrow(): void
+    public function testInvalidUtf8NeitherThrowsNorCostsTheBatch(): void
     {
         $logdash = Logdash::create(['apiKey' => 'test-api-key', 'host' => self::$host]);
 
         $logdash->logger()->info('upload', ['file' => "caf\xe9.txt"]);
+        $logdash->logger()->info("caf\xe9.txt");
+        $logdash->logger()->info('done');
+        $logdash->flush();
 
         $this->assertSame(
-            ['upload {"file":"caf\\ufffd.txt"}'],
-            array_column($this->receivedBodies('POST /logs'), 'message')
+            ['upload {"file":"caf\\ufffd.txt"}', "caf\u{fffd}.txt", 'done'],
+            array_column($this->sentLogs(), 'message')
         );
     }
 
@@ -125,6 +132,164 @@ class LogdashTest extends TestCase
         $this->assertEquals('verbose', LogLevel::VERBOSE->value);
         $this->assertEquals('debug', LogLevel::DEBUG->value);
         $this->assertEquals('silly', LogLevel::SILLY->value);
+    }
+
+    public function testNothingIsSentBeforeAFlush(): void
+    {
+        $logdash = Logdash::create(['apiKey' => 'test-api-key', 'host' => self::$host]);
+
+        $logdash->logger()->info('Test info');
+        $logdash->metrics()->set('test_metric', 42.5);
+        $logdash->track('agent_run');
+
+        $this->assertSame('', file_get_contents(self::$requestsFile));
+
+        $logdash->flush();
+
+        $this->assertCount(1, $this->sentLogs());
+        $this->assertCount(1, $this->receivedRequests('PUT /metrics'));
+        $this->assertCount(1, $this->receivedRequests('POST /events'));
+    }
+
+    public function testLogsGoInOneBatchInTheirOrder(): void
+    {
+        $logdash = Logdash::create(['apiKey' => 'test-api-key', 'host' => self::$host]);
+
+        $logdash->logger()->info('first');
+        $logdash->logger()->error('second');
+        $logdash->logger()->warn('third');
+        $logdash->flush();
+
+        $batches = $this->receivedRequests('POST /logs/batch');
+
+        $this->assertCount(1, $batches);
+        $this->assertSame('test-api-key', $batches[0]['headers']['project-api-key']);
+        $this->assertSame('application/json', $batches[0]['headers']['content-type']);
+        $this->assertSame(
+            [['first', 'info', 0], ['second', 'error', 1], ['third', 'warning', 2]],
+            array_map(
+                fn (array $log): array => [$log['message'], $log['level'], $log['sequenceNumber']],
+                $batches[0]['body']['logs']
+            )
+        );
+    }
+
+    public function testAScriptSendsWhatItBufferedWhenItEnds(): void
+    {
+        $this->printedBy(sprintf(
+            '$logdash = Logdash\Logdash::create(%s);
+            for ($i = 0; $i <= 100; $i++) {
+                $logdash->logger()->info("log {$i}");
+            }
+            $logdash->metrics()->mutate("test_counter", 1);
+            $logdash->track("agent_run");',
+            var_export(['apiKey' => 'test-api-key', 'host' => self::$host], true)
+        ));
+
+        // The first 100 fill a batch and go at once, the rest when the script ends
+        $this->assertSame(
+            [100, 1],
+            array_map(fn (array $body): int => count($body['logs']), $this->receivedBodies('POST /logs/batch'))
+        );
+        $this->assertCount(1, $this->receivedRequests('PUT /metrics'));
+        $this->assertCount(1, $this->receivedRequests('POST /events'));
+    }
+
+    public function testALogFromALaterShutdownFunctionIsSentToo(): void
+    {
+        $this->printedBy(sprintf(
+            '$logger = Logdash\Logdash::create(%s)->logger();
+            $logger->info("before");
+            register_shutdown_function(fn () => $logger->error("from a shutdown function"));',
+            var_export(['apiKey' => 'test-api-key', 'host' => self::$host], true)
+        ));
+
+        $this->assertSame(['before', 'from a shutdown function'], array_column($this->sentLogs(), 'message'));
+    }
+
+    public function testALogASecondAfterTheOldestSendsTheBuffer(): void
+    {
+        $logdash = Logdash::create(['apiKey' => 'test-api-key', 'host' => self::$host]);
+
+        $logdash->logger()->info('first');
+        usleep(1_000_000);
+
+        $this->assertSame([], $this->sentLogs());
+
+        $logdash->logger()->info('a second later');
+
+        $this->assertSame(['first', 'a second later'], array_column($this->sentLogs(), 'message'));
+    }
+
+    public function testMetricUpdatesMergeTheWayTheApiMergesThem(): void
+    {
+        $logdash = Logdash::create(['apiKey' => 'test-api-key', 'host' => self::$host]);
+        $metrics = $logdash->metrics();
+
+        $metrics->set('users', 5);
+        $metrics->mutate('users', 1);
+        $metrics->mutate('users', 2);
+        $metrics->mutate('logins', 1);
+        $metrics->mutate('logins', 2);
+        $metrics->mutate('errors', 1);
+        $metrics->set('errors', 0);
+        $logdash->flush();
+
+        // One request per metric, so its updates cannot arrive out of order
+        $this->assertEquals(
+            [
+                'users' => ['name' => 'users', 'value' => 8, 'operation' => 'set'],
+                'logins' => ['name' => 'logins', 'value' => 3, 'operation' => 'change'],
+                'errors' => ['name' => 'errors', 'value' => 0, 'operation' => 'set'],
+            ],
+            array_column($this->receivedBodies('PUT /metrics'), null, 'name')
+        );
+    }
+
+    public function testAMetricOrEventThatJsonCannotCarryCostsNothingElse(): void
+    {
+        $logdash = Logdash::create(['apiKey' => 'test-api-key', 'host' => self::$host]);
+
+        $logdash->logger()->info('Test info');
+        $logdash->metrics()->set('broken', INF);
+        $logdash->metrics()->mutate('test_counter', 1);
+        $logdash->track('agent_run', ['ratio' => NAN]);
+        $logdash->track('agent_run');
+        $logdash->flush();
+
+        $this->assertCount(1, $this->sentLogs());
+        $this->assertSame(['test_counter'], array_column($this->receivedBodies('PUT /metrics'), 'name'));
+        $this->assertCount(1, $this->receivedRequests('POST /events'));
+    }
+
+    #[DataProvider('failures')]
+    public function testLogsAndEventsGetOneRetryForAFailureThatCanPassAndMetricsNone(int $status, int $attempts): void
+    {
+        file_put_contents(self::$statusesFile, implode(PHP_EOL, [$status, $status, $status]));
+        $logdash = Logdash::create(['apiKey' => 'test-api-key', 'host' => self::$host]);
+
+        $logdash->logger()->info('Test info');
+        $logdash->metrics()->mutate('test_counter', 1);
+        $logdash->track('agent_run');
+        $logdash->flush();
+
+        $events = $this->receivedBodies('POST /events');
+
+        $this->assertCount($attempts, $this->receivedRequests('POST /logs/batch'));
+        $this->assertCount(1, $this->receivedRequests('PUT /metrics'), 'A retried change could apply twice');
+        $this->assertCount($attempts, $events);
+        $this->assertCount(1, array_unique(array_column($events, 'id')), 'A retry sends the same event ID');
+    }
+
+    /**
+     * @return array<string, array{int, int}>
+     */
+    public static function failures(): array
+    {
+        return [
+            'server error' => [500, 2],
+            'rate limit' => [429, 1],
+        ];
     }
 
     #[DataProvider('apps')]
@@ -141,8 +306,9 @@ class LogdashTest extends TestCase
         $logdash->metrics()->set('test_metric', 42.5);
         $logdash->metrics()->mutate('test_counter', 1);
         $logdash->track('agent_run');
+        $logdash->flush();
 
-        $this->assertSame([$sentApp, $sentApp], array_column($this->receivedBodies('POST /logs'), 'app'));
+        $this->assertSame([$sentApp, $sentApp], array_column($this->sentLogs(), 'app'));
         $this->assertSame([$sentApp, $sentApp], array_column($this->receivedBodies('PUT /metrics'), 'app'));
         $this->assertSame([$sentApp], array_column($this->receivedBodies('POST /events'), 'app'));
     }
@@ -169,8 +335,9 @@ class LogdashTest extends TestCase
         $logdash->logger()->info('Test info');
         $logdash->metrics()->set('test_metric', 42.5);
         $logdash->track('agent_run');
+        $logdash->flush();
 
-        $logs = $this->receivedBodies('POST /logs');
+        $logs = $this->sentLogs();
         $metrics = $this->receivedBodies('PUT /metrics');
         $events = $this->receivedBodies('POST /events');
 
@@ -199,6 +366,7 @@ class LogdashTest extends TestCase
         $logdash = Logdash::create(['apiKey' => 'test-api-key', 'host' => self::$host]);
 
         $logdash->track('agent_run', ['agent' => 'support', 'steps' => 4, 'success' => true]);
+        $logdash->flush();
 
         $events = $this->receivedRequests('POST /events');
 
@@ -218,6 +386,7 @@ class LogdashTest extends TestCase
 
         $logdash->track('agent_run');
         $logdash->track('agent_run');
+        $logdash->flush();
 
         $ids = array_column($this->receivedBodies('POST /events'), 'id');
 
@@ -233,6 +402,7 @@ class LogdashTest extends TestCase
         $logdash = Logdash::create(['apiKey' => 'test-api-key', 'host' => self::$host]);
 
         $logdash->track('agent_run', [], $userId);
+        $logdash->flush();
 
         $events = $this->receivedBodies('POST /events');
 
@@ -299,17 +469,40 @@ class LogdashTest extends TestCase
         $this->assertSame([], $this->receivedRequests('POST /events'));
     }
 
-    public function testTrackDoesNotThrowWhenTheApiIsUnreachable(): void
+    #[DataProvider('unreachableHosts')]
+    public function testFlushDoesNotThrowWhenTheApiIsUnreachable(string $host): void
     {
-        $logdash = Logdash::create(['apiKey' => 'test-api-key', 'host' => 'http://127.0.0.1:1']);
+        $logdash = Logdash::create(['apiKey' => 'test-api-key', 'host' => $host]);
 
+        $logdash->logger()->info('Test info');
+        $logdash->metrics()->set('test_metric', 42.5);
         $logdash->track('agent_run');
+        $logdash->flush();
 
         $this->assertTrue(true); // If we get here, no exceptions were thrown
     }
 
     /**
-     * @return list<array<string, mixed>> JSON bodies the local server received for $request, such as "POST /logs"
+     * @return array<string, array{string}>
+     */
+    public static function unreachableHosts(): array
+    {
+        return [
+            'closed port' => ['http://127.0.0.1:1'],
+            'no URL' => ['http://:80'],
+        ];
+    }
+
+    /**
+     * @return list<array<string, mixed>> The logs of every batch the local server received
+     */
+    private function sentLogs(): array
+    {
+        return array_merge(...array_column($this->receivedBodies('POST /logs/batch'), 'logs'));
+    }
+
+    /**
+     * @return list<array<string, mixed>> JSON bodies the local server received for $request, such as "PUT /metrics"
      */
     private function receivedBodies(string $request): array
     {
