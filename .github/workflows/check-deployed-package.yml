@@ -22,7 +22,7 @@ jobs:
       - run: ./check-deployed-package/run.sh
         env:
           VERSION: ${{ inputs.version }}
-          # Sends the logs and metrics: the ingest key of the smoke-test project
+          # Sends the logs and metrics: the ingest key of the SDK smoke tests domain
           LOGDASH_API_KEY: ${{ secrets.LOGDASH_API_KEY }}
-          # Reads them back: an ldp_ key with logs:read and metrics:read, restricted to that project
+          # Reads them back: an ldp_ key with logs:read and metrics:read, restricted to that domain
           LOGDASH_PERSONAL_API_KEY: ${{ secrets.LOGDASH_PERSONAL_API_KEY }}

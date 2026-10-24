@@ -17,18 +17,20 @@ function fail(string $message): never
 // Such as a 401 from whoami for a personal API key that is wrong, or revoked
 set_exception_handler(fn (Throwable $e) => fail($e->getMessage()));
 
-$apiKey = getenv('LOGDASH_API_KEY') ?: fail('Set LOGDASH_API_KEY to the API key of the smoke-test project');
+$apiKey = getenv('LOGDASH_API_KEY') ?: fail('Set LOGDASH_API_KEY to the ingest key of the SDK smoke tests domain');
 $personalApiKey = getenv('LOGDASH_PERSONAL_API_KEY') ?: fail(
-    'Set LOGDASH_PERSONAL_API_KEY to an ldp_ key with logs:read and metrics:read, restricted to the smoke-test project'
+    'Set LOGDASH_PERSONAL_API_KEY to an ldp_ key with logs:read and metrics:read, restricted to the SDK smoke tests domain'
 );
 
+// Each SDK sends as its own app on the shared smoke-test domain
+$app = 'php-sdk';
 $seed = bin2hex(random_bytes(8));
 $users = random_int(1, 1_000_000);
 
 echo "=== Logdash PHP SDK package check ===" . PHP_EOL;
 echo "Sending a log of each level with seed {$seed}, setting users to {$users} and adding 1" . PHP_EOL;
 
-$logdash = Logdash::create(['apiKey' => $apiKey, 'verbose' => true]);
+$logdash = Logdash::create(['apiKey' => $apiKey, 'verbose' => true, 'app' => $app]);
 $sent = [];
 
 foreach (
@@ -64,22 +66,23 @@ $get = fn (string $path, array $query = []): array => json_decode(
     JSON_THROW_ON_ERROR
 );
 
-// The key reads only the smoke-test project, which whoami names
+// The key reads only the smoke-test domain, which whoami names
 $access = $get('/personal-api-keys/whoami')['access'];
 
-if ($access['kind'] !== 'projects' || count($access['ids']) !== 1) {
-    fail('LOGDASH_PERSONAL_API_KEY must be restricted to the smoke-test project, its access is ' . json_encode($access));
+if (($access['kind'] ?? null) !== 'clusters' || count($access['ids'] ?? []) !== 1) {
+    fail('LOGDASH_PERSONAL_API_KEY must be restricted to the smoke-test domain, its access is ' . json_encode($access));
 }
 
-$projectId = $access['ids'][0];
-echo "Reading them back from project {$projectId}" . PHP_EOL;
+$domainId = $access['ids'][0];
+echo "Reading them back from app {$app} on domain {$domainId}" . PHP_EOL;
 
 // The API stores what it gets every second
 for ($attempt = 1; $attempt <= 30; $attempt++) {
     sleep(2);
-    $logs = $get("/projects/{$projectId}/logs/v2", ['limit' => 100, 'searchString' => $seed]);
+    $logs = $get("/clusters/{$domainId}/logs", ['apps' => $app, 'limit' => 100, 'searchString' => $seed]);
     $found = array_column($logs, 'level', 'message');
-    $value = array_column($get("/projects/{$projectId}/metrics"), 'value', 'name')['users'] ?? null;
+    $metrics = array_filter($get("/clusters/{$domainId}/metrics"), fn (array $m) => $m['app'] === $app);
+    $value = array_column($metrics, 'value', 'name')['users'] ?? null;
 
     if ($found == $sent && $value == $users + 1) {
         echo "Found every log with its level, and users at {$value}" . PHP_EOL;
