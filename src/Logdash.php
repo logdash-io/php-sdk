@@ -26,14 +26,15 @@ class Logdash
     }
 
     /**
-     * @param array{apiKey?:string, host?:string, verbose?:bool}|null $params
+     * @param array{apiKey?:string, host?:string, verbose?:bool, app?:string}|null $params
      */
     public static function create(?array $params = null): self
     {
         $initParams = new InitializationParams(
             apiKey: $params['apiKey'] ?? null,
             host: $params['host'] ?? 'https://api.logdash.io',
-            verbose: $params['verbose'] ?? false
+            verbose: $params['verbose'] ?? false,
+            app: $params['app'] ?? null
         );
 
         $requiredParams = $initParams->toRequired();
