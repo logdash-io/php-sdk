@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Logdash;
 
+use Logdash\Events\Events;
 use Logdash\Logger\Logger;
 use Logdash\Metrics\BaseMetrics;
 use Logdash\Types\InitializationParams;
@@ -16,13 +17,16 @@ class Logdash
 {
     private Logger $logger;
     private BaseMetrics $metrics;
+    private Events $events;
 
     private function __construct(
         Logger $logger,
-        BaseMetrics $metrics
+        BaseMetrics $metrics,
+        Events $events
     ) {
         $this->logger = $logger;
         $this->metrics = $metrics;
+        $this->events = $events;
     }
 
     /**
@@ -49,7 +53,7 @@ class Logdash
             }
         );
 
-        return new self($logger, $metrics);
+        return new self($logger, $metrics, new Events($requiredParams));
     }
 
     public function logger(): Logger
@@ -60,5 +64,17 @@ class Logdash
     public function metrics(): BaseMetrics
     {
         return $this->metrics;
+    }
+
+    /**
+     * Tracks an event, such as an agent run or a signup, and never throws.
+     *
+     * @param string $name Matches [a-z][a-z0-9_]{0,63}, any other name drops the event with a warning
+     * @param array<string, string|int|float|bool> $props Up to 10 properties, never personal data
+     * @param string|int|null $userId The signed-in user's internal ID, never an email address
+     */
+    public function track(string $name, array $props = [], string|int|null $userId = null): void
+    {
+        $this->events->track($name, $props, $userId);
     }
 }

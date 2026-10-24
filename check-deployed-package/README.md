@@ -1,4 +1,4 @@
-# Logdash Rust SDK Demo
+# Logdash PHP SDK Demo
 
 Use command below to test if the published SDK works:
 

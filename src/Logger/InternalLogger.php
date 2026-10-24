@@ -24,6 +24,11 @@ class InternalLogger
         $this->internalLog(LogLevel::INFO, implode(' ', $data));
     }
 
+    public function warn(string ...$data): void
+    {
+        $this->internalLog(LogLevel::WARN, implode(' ', $data));
+    }
+
     public function verbose(string ...$data): void
     {
         $this->internalLog(LogLevel::VERBOSE, implode(' ', $data));

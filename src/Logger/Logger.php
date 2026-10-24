@@ -139,7 +139,8 @@ class Logger
             }
 
             if (is_array($item) || is_object($item)) {
-                return json_encode($item, JSON_THROW_ON_ERROR);
+                // Never throws into the app, for example on a Latin-1 string
+                return (string) json_encode($item, JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR);
             }
 
             return var_export($item, true);
